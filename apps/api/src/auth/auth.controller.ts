@@ -2,15 +2,23 @@ import { Controller, Post, Body, Request, UseGuards, Get } from '@nestjs/common'
 import { AuthService } from './auth.service';
 import { Prisma } from '@repo/database';
 import { AuthGuard } from '@nestjs/passport';
+import { LoginDto } from './dto/auth.dto';
+
+interface RequestWithUser extends Request {
+    user: {
+        userId: string;
+        email: string;
+        role: string;
+    };
+}
 
 @Controller('auth')
 export class AuthController {
     constructor(private authService: AuthService) { }
 
     @Post('login')
-    async login(@Body() req: any) {
-        // In a real app, use a DTO and validation pipe
-        const user = await this.authService.validateUser(req.email, req.password);
+    async login(@Body() loginDto: LoginDto) {
+        const user = await this.authService.validateUser(loginDto.email, loginDto.password);
         if (!user) {
             return { error: 'Invalid credentials' };
         }
@@ -24,7 +32,7 @@ export class AuthController {
 
     @UseGuards(AuthGuard('jwt'))
     @Get('profile')
-    getProfile(@Request() req: any) {
+    getProfile(@Request() req: RequestWithUser) {
         return req.user;
     }
 }
