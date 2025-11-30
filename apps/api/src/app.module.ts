@@ -6,6 +6,7 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { PlayersModule } from './players/players.module';
 import { TrainingsModule } from './trainings/trainings.module';
+import { MatchesModule } from './matches/matches.module';
 import { ConfigModule } from '@nestjs/config';
 
 @Module({
@@ -16,6 +17,7 @@ import { ConfigModule } from '@nestjs/config';
     AuthModule,
     PlayersModule,
     TrainingsModule,
+    MatchesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
