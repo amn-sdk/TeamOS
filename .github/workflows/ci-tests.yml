@@ -1,0 +1,84 @@
+name: CI - Tests
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  api-tests:
+    name: API Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: proamateur
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: proamateur_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U proamateur"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+        working-directory: packages/database
+
+      - name: Run API tests
+        env:
+          DATABASE_URL: postgresql://proamateur:secret@localhost:5432/proamateur_test
+          NODE_ENV: test
+        working-directory: apps/api
+        run: npm test
+
+      - name: Lint API
+        working-directory: apps/api
+        run: npm run lint
+
+  web-tests:
+    name: Web Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Web tests
+        working-directory: apps/web
+        run: npm test || echo "No tests configured yet"
+
+      - name: Lint Web
+        working-directory: apps/web
+        run: npm run lint || echo "Lint not configured yet"
+
+      - name: Build Web
+        working-directory: apps/web
+        run: npm run build

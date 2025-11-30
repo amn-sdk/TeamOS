@@ -1,0 +1,61 @@
+name: Deploy to Kubernetes
+
+on:
+  workflow_run:
+    workflows: ["Build and Push Docker Images"]
+    types:
+      - completed
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    name: Deploy to K8s
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+      # This step requires KUBE_CONFIG secret to be set in GitHub Secrets
+      # For Minikube or local cluster, you'll need to expose it or use a cloud provider
+      - name: Configure kubectl
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
+
+      - name: Set image tags
+        id: image-tags
+        run: |
+          # Use SHA-based tags for deployments
+          API_IMAGE="ghcr.io/${{ github.repository }}/api:main-${{ github.sha }}"
+          WEB_IMAGE="ghcr.io/${{ github.repository }}/web:main-${{ github.sha }}"
+          echo "api_image=${API_IMAGE}" >> $GITHUB_OUTPUT
+          echo "web_image=${WEB_IMAGE}" >> $GITHUB_OUTPUT
+
+      - name: Update deployment manifests
+        run: |
+          sed -i "s|IMAGE_API|${{ steps.image-tags.outputs.api_image }}|g" infra/k8s/api.yaml
+          sed -i "s|IMAGE_WEB|${{ steps.image-tags.outputs.web_image }}|g" infra/k8s/web.yaml
+
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f infra/k8s/postgres.yaml
+          kubectl apply -f infra/k8s/redis.yaml
+          kubectl apply -f infra/k8s/api.yaml
+          kubectl apply -f infra/k8s/web.yaml
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/api --timeout=5m
+          kubectl rollout status deployment/web --timeout=5m
+
+      - name: Verify deployment
+        run: |
+          kubectl get pods
+          kubectl get services
