@@ -1,0 +1,461 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  PRESIDENT
+  TRESORIER
+  COACH
+  JOUEUR
+  INTENDANT
+}
+
+enum PlayerStatus {
+  ACTIVE
+  BLESSE
+  SUSPENDU
+  ABSENT_LONG
+  NON_QUALIFIE
+}
+
+enum Foot {
+  GAUCHE
+  DROIT
+  AMBIDEXTRE
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(JOUEUR)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  player Player?
+}
+
+model Club {
+  id        String   @id @default(uuid())
+  name      String
+  city      String?
+  country   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  teams   Team[]
+  seasons Season[]
+}
+
+model Season {
+  id        String   @id @default(uuid())
+  clubId    String
+  club      Club     @relation(fields: [clubId], references: [id])
+  name      String // ex: "2025-2026"
+  startDate DateTime
+  endDate   DateTime
+  isCurrent Boolean  @default(false)
+
+  teams    Team[]
+  licenses License[]
+  matches  Match[]
+}
+
+model Team {
+  id       String @id @default(uuid())
+  clubId   String
+  club     Club   @relation(fields: [clubId], references: [id])
+  seasonId String
+  season   Season @relation(fields: [seasonId], references: [id])
+  name     String // ex: "Sénior A"
+  category String // ex: "Senior", "U17"
+
+  players   Player[]
+  trainings Training[]
+  matches   Match[]
+}
+
+model Player {
+  id            String       @id @default(uuid())
+  teamId        String
+  team          Team         @relation(fields: [teamId], references: [id])
+  userId        String?      @unique
+  user          User?        @relation(fields: [userId], references: [id])
+  firstName     String
+  lastName      String
+  birthdate     DateTime?
+  phone         String?
+  parentContact String?
+  status        PlayerStatus @default(ACTIVE)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  profile            PlayerProfile?
+  licenses           License[]
+  injuries           Injury[]
+  trainingAttendance TrainingAttendance[]
+  trainingRpe        TrainingRpe[]
+  matchLineups       MatchLineup[]
+  matchStats         PlayerMatchStats[]
+  matchEvents        MatchEvent[]
+  payments           Payment[]
+}
+
+model PlayerProfile {
+  id                String  @id @default(uuid())
+  playerId          String  @unique
+  player            Player  @relation(fields: [playerId], references: [id])
+  mainPosition      String?
+  secondaryPosition String?
+  foot              Foot?
+  heightCm          Int?
+  weightKg          Int?
+  shirtNumber       Int?
+  jerseySize        String?
+  shortSize         String?
+  sockSize          String?
+}
+
+// --- Training Module ---
+
+enum TrainingIntensity {
+  FAIBLE
+  MODEREE
+  FORTE
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  EXCUSE
+  RETARD
+  DEPART_ANTICIPE
+}
+
+model Training {
+  id              String             @id @default(uuid())
+  teamId          String
+  team            Team               @relation(fields: [teamId], references: [id])
+  date            DateTime
+  startTime       DateTime
+  endTime         DateTime
+  location        String?
+  surface         String?
+  theme           String?
+  intensityTarget TrainingIntensity?
+
+  exercises  TrainingExercise[]
+  attendance TrainingAttendance[]
+  rpe        TrainingRpe[]
+}
+
+model Exercise {
+  id                String  @id @default(uuid())
+  clubId            String
+  name              String
+  category          String
+  description       String?
+  defaultDuration   Int?
+  requiresEquipment Json? // { "ballons": 10 }
+
+  trainingExercises TrainingExercise[]
+}
+
+model TrainingExercise {
+  id          String   @id @default(uuid())
+  trainingId  String
+  training    Training @relation(fields: [trainingId], references: [id])
+  exerciseId  String
+  exercise    Exercise @relation(fields: [exerciseId], references: [id])
+  durationMin Int
+  orderIndex  Int
+}
+
+model TrainingAttendance {
+  id               String           @id @default(uuid())
+  trainingId       String
+  training         Training         @relation(fields: [trainingId], references: [id])
+  playerId         String
+  player           Player           @relation(fields: [playerId], references: [id])
+  status           AttendanceStatus
+  lateMinutes      Int?
+  leftEarlyMinutes Int?
+  minutesEffective Int?
+}
+
+model TrainingRpe {
+  id         String   @id @default(uuid())
+  trainingId String
+  training   Training @relation(fields: [trainingId], references: [id])
+  playerId   String
+  player     Player   @relation(fields: [playerId], references: [id])
+  rpeValue   Int // 1-10
+  createdAt  DateTime @default(now())
+}
+
+// --- Match Module ---
+
+enum MatchType {
+  CHAMPIONNAT
+  COUPE
+  AMICAL
+  TOURNOI
+}
+
+enum HomeAway {
+  DOMICILE
+  EXTERIEUR
+}
+
+model Match {
+  id            String    @id @default(uuid())
+  teamId        String
+  team          Team      @relation(fields: [teamId], references: [id])
+  seasonId      String
+  season        Season    @relation(fields: [seasonId], references: [id])
+  competition   String?
+  matchType     MatchType
+  homeAway      HomeAway
+  opponentName  String
+  date          DateTime
+  startTime     DateTime
+  location      String?
+  scoreFor      Int?
+  scoreAgainst  Int?
+  htScoreFor    Int?
+  htScoreAgainst Int?
+
+  lineups MatchLineup[]
+  events  MatchEvent[]
+  stats   PlayerMatchStats[]
+}
+
+enum LineupRole {
+  TITULAIRE
+  REMPLACANT
+  NON_ENTRE
+}
+
+model MatchLineup {
+  id            String     @id @default(uuid())
+  matchId       String
+  match         Match      @relation(fields: [matchId], references: [id])
+  playerId      String
+  player        Player     @relation(fields: [playerId], references: [id])
+  role          LineupRole
+  position      String?
+  minutesPlayed Int?
+  rating        Int?
+}
+
+enum MatchEventType {
+  BUT
+  BUT_CONTRE
+  PASSE_DEC
+  CARTON_JAUNE
+  CARTON_ROUGE
+  CHANGEMENT
+}
+
+model MatchEvent {
+  id                String         @id @default(uuid())
+  matchId           String
+  match             Match          @relation(fields: [matchId], references: [id])
+  minute            Int
+  eventType         MatchEventType
+  playerMainId      String?
+  playerMain        Player?        @relation(fields: [playerMainId], references: [id])
+  playerSecondaryId String? // ex: passeur
+  details           Json?
+}
+
+model PlayerMatchStats {
+  id              String @id @default(uuid())
+  matchId         String
+  match           Match  @relation(fields: [matchId], references: [id])
+  playerId        String
+  player          Player @relation(fields: [playerId], references: [id])
+  goals           Int    @default(0)
+  assists         Int    @default(0)
+  yellowCards     Int    @default(0)
+  redCards        Int    @default(0)
+  penaltiesScored Int    @default(0)
+  penaltiesMissed Int    @default(0)
+}
+
+// --- Injury Module ---
+
+enum InjuryType {
+  MUSCULAIRE
+  ARTICULAIRE
+  TRAUMATIQUE
+  AUTRE
+}
+
+enum InjuryContext {
+  MATCH
+  ENTRAINEMENT
+  HORS_TERRAIN
+}
+
+enum InjuryStatus {
+  REPOS
+  REEDUCATION
+  FOOTING
+  SANS_CONTACT
+  AVEC_CONTACT
+  APTE_MATCH
+}
+
+model Injury {
+  id                 String        @id @default(uuid())
+  playerId           String
+  player             Player        @relation(fields: [playerId], references: [id])
+  dateInjury         DateTime
+  context            InjuryContext
+  type               InjuryType
+  location           String
+  severity           String? // LIGERE, MOYENNE, GRAVE
+  expectedReturnDate DateTime?
+  actualReturnDate   DateTime?
+  status             InjuryStatus
+}
+
+// --- License Module ---
+
+enum LicenseType {
+  JOUEUR
+  EDUCATEUR
+  DIRIGEANT
+}
+
+enum LicenseStatus {
+  BROUILLON
+  DOSSIER_INCOMPLET
+  ENVOYE_FOOTCLUBS
+  VALIDEE_FFF
+  REFUSEE
+}
+
+model License {
+  id                          String        @id @default(uuid())
+  playerId                    String
+  player                      Player        @relation(fields: [playerId], references: [id])
+  seasonId                    String
+  season                      Season        @relation(fields: [seasonId], references: [id])
+  licenseNumber               String?
+  licenseType                 LicenseType
+  status                      LicenseStatus @default(BROUILLON)
+  validationDate              DateTime?
+  medicalCertificateExpiration DateTime?
+
+  documents LicenseDocument[]
+}
+
+enum DocType {
+  CERTIF_MEDICAL
+  PHOTO
+  ID
+}
+
+model LicenseDocument {
+  id        String  @id @default(uuid())
+  licenseId String
+  license   License @relation(fields: [licenseId], references: [id])
+  docType   DocType
+  fileUrl   String
+}
+
+// --- Payment Module ---
+
+enum PaymentStatus {
+  NON_PAYE
+  PARTIEL
+  PAYE
+}
+
+model Payment {
+  id          String        @id @default(uuid())
+  playerId    String
+  player      Player        @relation(fields: [playerId], references: [id])
+  seasonId    String // Link to season for context
+  amountTotal Decimal
+  status      PaymentStatus @default(NON_PAYE)
+
+  schedules PaymentSchedule[]
+}
+
+enum PaymentScheduleStatus {
+  A_PAYER
+  PAYE
+  EN_RETARD
+}
+
+enum PaymentMethod {
+  CHEQUE
+  ESPECES
+  VIREMENT
+  CB
+  PASS_SPORT
+  ANCV
+}
+
+model PaymentSchedule {
+  id        String                @id @default(uuid())
+  paymentId String
+  payment   Payment               @relation(fields: [paymentId], references: [id])
+  dueDate   DateTime
+  amount    Decimal
+  status    PaymentScheduleStatus @default(A_PAYER)
+  method    PaymentMethod?
+  reference String? // Cheque number etc
+}
+
+// --- Inventory Module ---
+
+enum ItemCondition {
+  NEUF
+  BON
+  USE
+  A_RENOUVELER
+  HS
+}
+
+model InventoryItem {
+  id            String        @id @default(uuid())
+  clubId        String
+  name          String
+  category      String
+  totalQuantity Int
+  condition     ItemCondition
+
+  allocations InventoryAllocation[]
+  losses      InventoryLoss[]
+}
+
+model InventoryAllocation {
+  id              String        @id @default(uuid())
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  teamId          String? // Allocated to team
+  userId          String? // Or to a person (coach)
+  quantity        Int
+  allocatedAt     DateTime      @default(now())
+  returnedAt      DateTime?
+}
+
+model InventoryLoss {
+  id              String        @id @default(uuid())
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  teamId          String?
+  quantity        Int
+  reason          String?
+  reportedAt      DateTime      @default(now())
+}
