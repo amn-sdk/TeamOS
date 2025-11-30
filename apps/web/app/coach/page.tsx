@@ -1,4 +1,6 @@
+import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Users, Calendar, Trophy } from 'lucide-react'
 
 export default function CoachDashboard() {
     return (
@@ -8,19 +10,27 @@ export default function CoachDashboard() {
             </h1>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Effectif</CardTitle>
-                        <CardDescription>Gérer les joueurs</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-2xl font-bold">23 joueurs</p>
-                    </CardContent>
-                </Card>
+                <Link href="/coach/players">
+                    <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Users className="h-5 w-5" />
+                                Effectif
+                            </CardTitle>
+                            <CardDescription>Gérer les joueurs</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-2xl font-bold">23 joueurs</p>
+                        </CardContent>
+                    </Card>
+                </Link>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Entraînements</CardTitle>
+                        <CardTitle className="flex items-center gap-2">
+                            <Calendar className="h-5 w-5" />
+                            Entraînements
+                        </CardTitle>
                         <CardDescription>Cette semaine</CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -30,7 +40,10 @@ export default function CoachDashboard() {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Prochain match</CardTitle>
+                        <CardTitle className="flex items-center gap-2">
+                            <Trophy className="h-5 w-5" />
+                            Prochain match
+                        </CardTitle>
                         <CardDescription>Championnat</CardDescription>
                     </CardHeader>
                     <CardContent>
